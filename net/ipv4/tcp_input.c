@@ -4401,7 +4401,7 @@ static void tcp_sack_remove(struct tcp_sock *tp)
 	struct tcp_sack_block *sp = &tp->selective_acks[0];
 	int num_sacks = tp->rx_opt.num_sacks;
 	int this_sack;
-
+	int acks_dim = sizeof(tp->selective_acks) / sizeof(struct tcp_sack_block);
 	/* Empty ofo queue, hence, all the SACKs are eaten. Clear. */
 	if (skb_queue_empty(&tp->out_of_order_queue)) {
 		tp->rx_opt.num_sacks = 0;
@@ -4417,8 +4417,10 @@ static void tcp_sack_remove(struct tcp_sock *tp)
 			WARN_ON(before(tp->rcv_nxt, sp->end_seq));
 
 			/* Zap this SACK, by moving forward any other SACKS. */
-			for (i=this_sack+1; i < num_sacks; i++)
+			for (i=this_sack+1; i < num_sacks; i++){
+				if(i >= acks_dim) break;
 				tp->selective_acks[i-1] = tp->selective_acks[i];
+			}
 			num_sacks--;
 			continue;
 		}
