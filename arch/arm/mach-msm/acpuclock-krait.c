@@ -939,7 +939,7 @@ ssize_t acpuclk_get_vdd_levels_str(char *buf) {
 
 		for (i = 0; drv.acpu_freq_tbl[i].speed.khz; i++) {
 			/* updated to use uv required by 8x60 architecture - faux123 */
-			len += sprintf(buf + len, "%8u: %8d\n", drv.acpu_freq_tbl[i].speed.khz,
+			len += sprintf(buf + len, "%8lu: %8d\n", drv.acpu_freq_tbl[i].speed.khz,
 				drv.acpu_freq_tbl[i].vdd_core);
 		}
 
