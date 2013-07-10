@@ -2584,6 +2584,15 @@ config MSM_DCVS
 	  algorithm and the algorithm returns a frequency for the core which is
 	  passed to the frequency change driver.
 
+choice
+	prompt "Hotplug governor"
+	default MSM_MPDECISION
+config INTELLI_PLUG
+	bool "intelli plug"
+config MSM_MPDECISION
+	bool "mp decision"
+endchoice
+
 config MSM_CPR
 	tristate "Use MSM CPR in S/W mode"
 	help
