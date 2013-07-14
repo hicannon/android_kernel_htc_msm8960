@@ -537,7 +537,7 @@ struct msm_hdmi_platform_data {
 	bool (*check_hdcp_hw_support)(void);
 	bool (*source)(void);
 	bool is_mhl_enabled;
-#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
+#if defined(CONFIG_MACH_HTC) && defined(CONFIG_FB_MSM_HDMI_MHL)
 	mhl_driving_params *driving_params;
 	int driving_params_count;
 #endif
@@ -573,6 +573,9 @@ struct msm_i2c_platform_data {
 	int use_gsbi_shared_mode;
 	int keep_ahb_clk_on;
 	void (*msm_i2c_config_gpio)(int iface, int config_type);
+#ifdef CONFIG_MACH_HTC
+	int share_uart_flag;
+#endif
 };
 
 struct msm_i2c_ssbi_platform_data {
