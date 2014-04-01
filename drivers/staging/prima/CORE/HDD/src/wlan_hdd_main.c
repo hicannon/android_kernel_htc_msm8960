@@ -4114,7 +4114,7 @@ static int __init hdd_module_init ( void)
 static int
 wcnss_ready_probe(struct platform_device *pdev)
 {
-   return hdd_module_init();
+  return hdd_module_init();
 }
 
 static struct platform_driver wcnss_ready = {
