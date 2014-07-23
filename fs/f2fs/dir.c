@@ -23,10 +23,10 @@ static unsigned long dir_blocks(struct inode *inode)
 
 static unsigned int dir_buckets(unsigned int level, int dir_level)
 {
-	if (level + dir_level < MAX_DIR_HASH_DEPTH / 2)
+	if (level < MAX_DIR_HASH_DEPTH / 2)
 		return 1 << (level + dir_level);
 	else
-		return MAX_DIR_BUCKETS;
+		return 1 << ((MAX_DIR_HASH_DEPTH / 2 + dir_level) - 1);
 }
 
 static unsigned int bucket_blocks(unsigned int level)
@@ -61,7 +61,7 @@ static unsigned char f2fs_type_by_mode[S_IFMT >> S_SHIFT] = {
 
 static void set_de_type(struct f2fs_dir_entry *de, struct inode *inode)
 {
-	umode_t mode = inode->i_mode;
+	mode_t mode = inode->i_mode;
 	de->file_type = f2fs_type_by_mode[(mode & S_IFMT) >> S_SHIFT];
 }
 
@@ -268,8 +268,6 @@ static void init_dent_inode(const struct qstr *name, struct page *ipage)
 {
 	struct f2fs_inode *ri;
 
-	f2fs_wait_on_page_writeback(ipage, NODE);
-
 	/* copy name info. to this inode page */
 	ri = F2FS_INODE(ipage);
 	ri->i_namelen = cpu_to_le32(name->len);
@@ -376,11 +374,11 @@ static struct page *init_inode_metadata(struct inode *inode,
 
 put_error:
 	f2fs_put_page(page, 1);
-error:
 	/* once the failed inode becomes a bad inode, i_mode is S_IFREG */
 	truncate_inode_pages(&inode->i_data, 0);
 	truncate_blocks(inode, 0);
 	remove_dirty_dir_inode(inode);
+error:
 	remove_inode_page(inode);
 	return ERR_PTR(err);
 }
@@ -631,32 +629,34 @@ bool f2fs_empty_dir(struct inode *dir)
 	return true;
 }
 
-static int f2fs_readdir(struct file *file, struct dir_context *ctx)
+static int f2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 {
-	struct inode *inode = file_inode(file);
+	unsigned long pos = file->f_pos;
+	struct inode *inode = file->f_dentry->d_inode;
 	unsigned long npages = dir_blocks(inode);
-	unsigned int bit_pos = 0;
+	unsigned char *types = NULL;
+	unsigned int bit_pos = 0, start_bit_pos = 0;
+	int over = 0;
 	struct f2fs_dentry_block *dentry_blk = NULL;
 	struct f2fs_dir_entry *de = NULL;
 	struct page *dentry_page = NULL;
-	struct file_ra_state *ra = &file->f_ra;
-	unsigned int n = ((unsigned long)ctx->pos / NR_DENTRY_IN_BLOCK);
+	unsigned int n = 0;
 	unsigned char d_type = DT_UNKNOWN;
+	int slots;
 
-	bit_pos = ((unsigned long)ctx->pos % NR_DENTRY_IN_BLOCK);
-
-	/* readahead for multi pages of dir */
-	if (npages - n > 1 && !ra_has_index(ra, n))
-		page_cache_sync_readahead(inode->i_mapping, ra, file, n,
-				min(npages - n, (pgoff_t)MAX_DIR_RA_PAGES));
+	types = f2fs_filetype_table;
+	bit_pos = (pos % NR_DENTRY_IN_BLOCK);
+	n = (pos / NR_DENTRY_IN_BLOCK);
 
 	for (; n < npages; n++) {
 		dentry_page = get_lock_data_page(inode, n);
 		if (IS_ERR(dentry_page))
 			continue;
 
+		start_bit_pos = bit_pos;
 		dentry_blk = kmap(dentry_page);
 		while (bit_pos < NR_DENTRY_IN_BLOCK) {
+			d_type = DT_UNKNOWN;
 			bit_pos = find_next_bit_le(&dentry_blk->dentry_bitmap,
 							NR_DENTRY_IN_BLOCK,
 							bit_pos);
@@ -664,26 +664,28 @@ static int f2fs_readdir(struct file *file, struct dir_context *ctx)
 				break;
 
 			de = &dentry_blk->dentry[bit_pos];
-			if (de->file_type < F2FS_FT_MAX)
-				d_type = f2fs_filetype_table[de->file_type];
-			else
-				d_type = DT_UNKNOWN;
-			if (!dir_emit(ctx,
+			if (types && de->file_type < F2FS_FT_MAX)
+				d_type = types[de->file_type];
+
+			over = filldir(dirent,
 					dentry_blk->filename[bit_pos],
 					le16_to_cpu(de->name_len),
-					le32_to_cpu(de->ino), d_type))
-				goto stop;
-
-			bit_pos += GET_DENTRY_SLOTS(le16_to_cpu(de->name_len));
-			ctx->pos = n * NR_DENTRY_IN_BLOCK + bit_pos;
+					(n * NR_DENTRY_IN_BLOCK) + bit_pos,
+					le32_to_cpu(de->ino), d_type);
+			if (over) {
+				file->f_pos += bit_pos - start_bit_pos;
+				goto success;
+			}
+			slots = GET_DENTRY_SLOTS(le16_to_cpu(de->name_len));
+			bit_pos += slots;
 		}
 		bit_pos = 0;
-		ctx->pos = (n + 1) * NR_DENTRY_IN_BLOCK;
+		file->f_pos = (n + 1) * NR_DENTRY_IN_BLOCK;
 		kunmap(dentry_page);
 		f2fs_put_page(dentry_page, 1);
 		dentry_page = NULL;
 	}
-stop:
+success:
 	if (dentry_page && !IS_ERR(dentry_page)) {
 		kunmap(dentry_page);
 		f2fs_put_page(dentry_page, 1);
@@ -695,7 +697,7 @@ stop:
 const struct file_operations f2fs_dir_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= generic_read_dir,
-	.iterate	= f2fs_readdir,
+	.readdir	= f2fs_readdir,
 	.fsync		= f2fs_sync_file,
 	.unlocked_ioctl	= f2fs_ioctl,
 };
