@@ -6864,7 +6864,7 @@ void csrRoamReissueRoamCommand(tpAniSirGlobal pMac)
     tListElem *pEntry;
     tSmeCmd *pCommand;
     tCsrRoamInfo roamInfo;
-    tANI_U32 sessionId;
+    tANI_U32 sessionId = 0;
     tCsrRoamSession *pSession;
             
     pEntry = csrLLPeekHead(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK);
@@ -7794,7 +7794,7 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             tSirSmeAssocIndToUpperLayerCnf *pUpperLayerAssocCnf;
             tCsrRoamInfo roamInfo;
             tCsrRoamInfo *pRoamInfo = NULL;
-            tANI_U32 sessionId;
+            tANI_U32 sessionId = 0;
             eHalStatus status;
             smsLog( pMac, LOG1, FL("ASSOCIATION confirmation can be given to upper layer "));
             palZeroMemory(pMac->hHdd, &roamInfo, sizeof(tCsrRoamInfo));
@@ -14293,7 +14293,7 @@ eHalStatus csrGetRssi(tpAniSirGlobal pMac,
 {  
    eHalStatus status = eHAL_STATUS_SUCCESS;
    vos_msg_t  msg;
-   tANI_U32 sessionId;
+   tANI_U32 sessionId = 0;
 
    tAniGetRssiReq *pMsg;
    smsLog(pMac, LOG2, FL("called"));
@@ -14766,7 +14766,7 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
    tANI_U8 i,j,num_channels = 0, ucDot11Mode;
    tANI_U8 *ChannelList = NULL;
    tANI_U8  MaxDwellPeriod;
-   tANI_U32 sessionId;
+   tANI_U32 sessionId = 0;
    eHalStatus status = eHAL_STATUS_SUCCESS;
    tpCsrChannelInfo    currChannelListInfo;
    tANI_U8 ChannelCacheStr[128] = {0};
